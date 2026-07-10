@@ -1,0 +1,17 @@
+# Source & dev artifacts — only dist/ is published (see package.json "files")
+src
+test
+examples
+node_modules
+coverage
+*.log
+.env
+.env.local
+.editorconfig
+.prettierrc
+.eslintrc*
+eslint.config.js
+tsconfig.json
+tsup.config.ts
+vitest.config.ts
+.github
