@@ -4,8 +4,9 @@
 [![CI](https://github.com/eduair94/whatsapp-data-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/eduair94/whatsapp-data-sdk/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/npm/l/whatsapp-data-sdk.svg)](./LICENSE)
 [![types: included](https://img.shields.io/npm/types/whatsapp-data-sdk.svg)](https://www.npmjs.com/package/whatsapp-data-sdk)
+[![website](https://img.shields.io/badge/website-whatsapp.checkleaked.cc-2ea44f)](https://whatsapp.checkleaked.cc)
 
-Typed TypeScript/JavaScript client for the **WhatsApp Data API** (checkleaked.cc / RapidAPI).
+Typed TypeScript/JavaScript client for the **WhatsApp Data API** — official SDK for **[whatsapp.checkleaked.cc](https://whatsapp.checkleaked.cc)** (also on RapidAPI).
 
 WhatsApp profile lookups, phone breaches, carrier data, Telegram checks, OSINT, geo/business search and bulk verification — plus a **cache-first lookup** that reads the cheap DB endpoint before spending on a live check.
 
