@@ -65,7 +65,7 @@ export interface ResolvedConfig {
 export const PROXY_BASE_URL = 'https://whatsapp-proxy.checkleaked.cc'
 export const RAPIDAPI_LIVE_HOST = 'wp-data.p.rapidapi.com'
 export const RAPIDAPI_CACHE_HOST = 'wp-data-db-only.p.rapidapi.com'
-export const DEFAULT_USER_AGENT = 'whatsapp-data-sdk/1.3.0 (+https://npm.im/whatsapp-data-sdk)'
+export const DEFAULT_USER_AGENT = 'whatsapp-data-sdk/1.3.1 (+https://npm.im/whatsapp-data-sdk)'
 
 const stripTrailingSlash = (url: string): string => url.replace(/\/+$/, '')
 

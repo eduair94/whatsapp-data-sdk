@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+- Docs: clarify that enrichments (face analysis, breach lookups, etc.) run entirely server-side — the SDK consumer never supplies Gemini/LeakCheck keys. The only user-provided key is your own checkleaked.cc key for `getPhoneBreachesExternal`.
+
 ## 1.3.0
 
 - Per-request `signal` (AbortSignal), `timeoutMs`, and `retries` on every method.
