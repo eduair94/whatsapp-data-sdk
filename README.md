@@ -238,7 +238,7 @@ toE164('59898297150')       // '+59898297150' (bulk-DB endpoints; their validato
 ## Notes
 
 - This SDK covers exactly the marketplace endpoints (profile, breaches, pictures, device count, search, Google-Maps/proximity search, bulk checks, Telegram, database, carrier, OSINT).
-- Some enrichments require server-side keys configured by the API operator (e.g. LeakCheck Pro for `getPhoneBreaches`, Gemini for face analysis).
+- Enrichments run entirely server-side — you never supply Gemini, LeakCheck, or any other keys. Face analysis, breach lookups, etc. are handled by the API. The only user-provided key is your own checkleaked.cc key for `getPhoneBreachesExternal`.
 
 ## License
 
