@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `rapidapi` transport: the live host is now `whatsapp-number-validator18.p.rapidapi.com`. RapidAPI removed the `wp-data.p.rapidapi.com` listing in November 2026, so the old default no longer answers. The validator listing is a separate subscription that returns validation data only; the README lists the methods it refuses. The cache host (`wp-data-db-only.p.rapidapi.com`) and the default `proxy` transport are unchanged.
+
 ## 1.3.1
 
 - Docs: clarify that enrichments (face analysis, breach lookups, etc.) run entirely server-side — the SDK consumer never supplies Gemini/LeakCheck keys. The only user-provided key is your own checkleaked.cc key for `getPhoneBreachesExternal`.

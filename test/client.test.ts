@@ -232,11 +232,11 @@ describe('rapidapi transport', () => {
     expect(calls[0]!.headers['x-rapidapi-host']).toBe('wp-data-db-only.p.rapidapi.com')
   })
 
-  it('routes live reads to the wp-data host', async () => {
+  it('routes live reads to the Number Validator host', async () => {
     const { client, calls } = make([{ json: {} }], { transport: 'rapidapi' })
     await client.getProfile('59898297150')
-    expect(calls[0]!.url).toBe('https://wp-data.p.rapidapi.com/number/59898297150')
-    expect(calls[0]!.headers['x-rapidapi-host']).toBe('wp-data.p.rapidapi.com')
+    expect(calls[0]!.url).toBe('https://whatsapp-number-validator18.p.rapidapi.com/number/59898297150')
+    expect(calls[0]!.headers['x-rapidapi-host']).toBe('whatsapp-number-validator18.p.rapidapi.com')
   })
 })
 

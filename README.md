@@ -42,7 +42,7 @@ Your API key is always sent in the `x-rapidapi-key` header. Choose where request
 | `transport`         | Live host                       | Cache / DB-only host                     | Notes |
 | ------------------- | ------------------------------- | ---------------------------------------- | ----- |
 | `'proxy'` (default) | `whatsapp-proxy.checkleaked.cc` | same host, `/number_cache` path          | Simple — one base URL, no host header. |
-| `'rapidapi'`        | `wp-data.p.rapidapi.com`        | `wp-data-db-only.p.rapidapi.com`         | Sets `x-rapidapi-host` automatically. Use your RapidAPI key. |
+| `'rapidapi'`        | `whatsapp-number-validator18.p.rapidapi.com`        | `wp-data-db-only.p.rapidapi.com`         | Sets `x-rapidapi-host` automatically. Use your RapidAPI key. |
 
 ```ts
 // RapidAPI marketplace (live + DB-only hosts)
@@ -53,6 +53,17 @@ const client = new WhatsAppDataClient({
 ```
 
 You can override any URL/host via `baseUrl`, `cacheBaseUrl`, `rapidApiHost`, `rapidApiCacheHost`.
+
+> **RapidAPI live host = the "Whatsapp Number Validator" listing.** The former
+> `wp-data.p.rapidapi.com` listing was removed from RapidAPI in November 2026.
+> The validator listing is a separate subscription that returns validation
+> data only: registration checks, carrier, device count, cache reads, bulk
+> checks and an official-business directory search. Profile data (display
+> name, about, photos) is omitted, and `getLastPicture`, `getTelegramProfile`,
+> `getPhoneBreaches`, `getPhoneBreachesExternal`, `getLeakedNumbersInfo`,
+> `downloadEntireDatabase`, `searchGoogleMaps` and `carrierLookupAlt` are
+> refused there. Use the default `proxy` transport with a direct API key for
+> those.
 
 ## 💸 Cache-first lookups (save money)
 
@@ -70,7 +81,7 @@ const r2 = await client.checkCached('59898297150', { mode: 'cacheOnly' })
 const r3 = await client.checkCached('59898297150', { mode: 'live' })
 ```
 
-On the `rapidapi` transport this routes the cache read to `wp-data-db-only.p.rapidapi.com` and the live fallback to `wp-data.p.rapidapi.com` — exactly the two-host money-saving flow.
+On the `rapidapi` transport this routes the cache read to `wp-data-db-only.p.rapidapi.com` and the live fallback to `whatsapp-number-validator18.p.rapidapi.com` — exactly the two-host money-saving flow.
 
 ## API
 

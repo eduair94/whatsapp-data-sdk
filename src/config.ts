@@ -11,7 +11,7 @@ export type FetchLike = (
  * - `proxy` (default): the free `whatsapp-proxy.checkleaked.cc` reverse proxy.
  *   One base URL; the cache lookup is distinguished by path (`/number_cache`).
  * - `rapidapi`: the RapidAPI marketplace. Live traffic goes to
- *   `wp-data.p.rapidapi.com`; cache/DB-only traffic to
+ *   `whatsapp-number-validator18.p.rapidapi.com`; cache/DB-only traffic to
  *   `wp-data-db-only.p.rapidapi.com`. Both require the `x-rapidapi-host` header.
  */
 export type Transport = 'proxy' | 'rapidapi'
@@ -63,7 +63,7 @@ export interface ResolvedConfig {
 }
 
 export const PROXY_BASE_URL = 'https://whatsapp-proxy.checkleaked.cc'
-export const RAPIDAPI_LIVE_HOST = 'wp-data.p.rapidapi.com'
+export const RAPIDAPI_LIVE_HOST = 'whatsapp-number-validator18.p.rapidapi.com'
 export const RAPIDAPI_CACHE_HOST = 'wp-data-db-only.p.rapidapi.com'
 export const DEFAULT_USER_AGENT = 'whatsapp-data-sdk/1.3.1 (+https://npm.im/whatsapp-data-sdk)'
 
