@@ -288,6 +288,83 @@ export interface ProximitySearchResponse {
   data: ProximitySearchData
 }
 
+/* ── Facebook leak search ──────────────────────────────────────────────── */
+
+/** Business details from the WhatsApp record of a Facebook leak row. */
+export interface FacebookLeakBusiness {
+  name?: string
+  description?: string
+  email?: string
+  /** Websites joined with `"; "`. */
+  website?: string
+  address?: string
+  /** Category names joined with `", "`. */
+  categories?: string
+}
+
+/** What the WhatsApp cache holds for a Facebook leak row's number. */
+export interface FacebookLeakWhatsAppSummary {
+  /** `'found'` = a WhatsApp account; `'notOnWhatsapp'` = checked, no account. */
+  status: 'found' | 'notOnWhatsapp'
+  name?: string
+  /**
+   * WhatsApp username (@handle). Present only where WhatsApp offers usernames
+   * and the account set one.
+   */
+  username?: string
+  about?: string
+  countryCode?: string
+  isBusiness?: boolean
+  isEnterprise?: boolean
+  /** Archived profile photo URL. */
+  photoUrl?: string
+  /** When the number was last checked on WhatsApp (ISO 8601). */
+  checkedAt?: string
+  business?: FacebookLeakBusiness
+}
+
+/** One row of `searchFacebookLeak`. */
+export interface FacebookLeakSearchItem {
+  /** Phone number, digits only (no `+`). */
+  number: string
+  /** Phone number in E.164 (`+` and digits). */
+  e164: string
+  regionCode?: string
+  fbId?: string
+  firstName?: string
+  lastName?: string
+  gender?: string
+  /** Remaining leak fields (location, region, relationshipStatus, company, email, birthdate, …). */
+  other?: Record<string, string>
+  /** `https://facebook.com/profile.php?id=…`, when the row has an `fbId`. */
+  facebookProfile?: string
+  /**
+   * The WhatsApp cache's record for the number. Absent when the number was
+   * never checked on WhatsApp, or the cross-reference was skipped
+   * (`whatsapp:false`) or unavailable (see `whatsappAvailable`).
+   */
+  whatsapp?: FacebookLeakWhatsAppSummary
+}
+
+/** The page carried by {@link FacebookLeakSearchResponse}. */
+export interface FacebookLeakSearchData {
+  docs: FacebookLeakSearchItem[]
+  /** Total matches, at most 10,000. */
+  totalDocs: number
+  /** `true` when there are more matches than `totalDocs`. */
+  capped: boolean
+  page: number
+  limit: number
+  /** `false` when the WhatsApp cross-reference was skipped or could not be read. */
+  whatsappAvailable: boolean
+}
+
+/** Response of `searchFacebookLeak` (`GET /facebook-leak/search`). */
+export interface FacebookLeakSearchResponse {
+  success: boolean
+  data: FacebookLeakSearchData
+}
+
 /* ── Database / leak downloads (Drive links) ──────────────────────────── */
 
 /**

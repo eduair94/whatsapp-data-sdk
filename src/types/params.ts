@@ -105,11 +105,59 @@ export interface SearchParams extends RequestConfig {
   facePeopleMin?: number
   facePeopleMax?: number
   /**
+   * Filter by WhatsApp username: the whole handle or its leading part, so
+   * `'frog'` matches `Frogdog_`. Case-insensitive; a leading `@` is ignored.
+   * Matches only the dedicated username, never a display name. Most records
+   * have no username.
+   */
+  username?: string
+  /**
+   * `true` = only numbers that have a WhatsApp username; `false` = only
+   * numbers without one. Ignored by the API when `username` is given.
+   */
+  hasUsername?: boolean
+  /**
    * Escape hatch for server-added filters not yet modelled above. Kept as a
    * dedicated field (instead of an open index signature) so typos in the named
    * filters above are still caught by the compiler.
    */
   extra?: Record<string, string | number | boolean>
+}
+
+/** Column group `q` is matched against in {@link FacebookLeakSearchParams}. */
+export type FacebookLeakSearchField = 'name' | 'email' | 'location' | 'work'
+
+/**
+ * Parameters for `searchFacebookLeak` (`GET /facebook-leak/search`).
+ *
+ * The API refuses out-of-range values with a `400` (it does not clamp them).
+ */
+export interface FacebookLeakSearchParams extends RequestConfig {
+  /**
+   * Free text, up to 200 characters and 8 words (e.g. a first and last name).
+   * Every word is matched literally; a trailing `*` matches a prefix of 3+
+   * characters. A value that is only a phone number is treated as `number`.
+   * Omit it to browse the records the filters allow, in phone-number order.
+   */
+  q?: string
+  /** Match `q` against one column group only. */
+  field?: FacebookLeakSearchField
+  /** Exact phone lookup with country code (8–15 digits). Takes precedence over `q`. */
+  number?: string
+  /** ISO 3166-1 alpha-2 country of the phone number, e.g. `'US'`. */
+  countryCode?: string
+  gender?: 'male' | 'female'
+  /** Only records that include an email address. */
+  hasEmail?: boolean
+  /**
+   * Cross each row with the WhatsApp cache (default `true` on the API). Pass
+   * `false` to skip it.
+   */
+  whatsapp?: boolean
+  /** Page number, `>= 1`. `page * limit` may not exceed 10,000. */
+  page?: number
+  /** Rows per page, 1–100 (default 25). */
+  limit?: number
 }
 
 /** Parameters for `searchGoogleMaps` (`GET /phone-numbers/proximity/search`). */

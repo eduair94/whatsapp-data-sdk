@@ -12,6 +12,8 @@ export interface MockResponse {
   json?: unknown
   bytes?: Uint8Array
   contentType?: string
+  /** Extra response headers (e.g. `retry-after`). */
+  headers?: Record<string, string>
 }
 
 /**
@@ -51,7 +53,7 @@ export function mockFetch(responses: MockResponse[]): {
 
     return new Response(payload, {
       status,
-      headers: { 'content-type': contentType },
+      headers: { 'content-type': contentType, ...(spec.headers ?? {}) },
     })
   }
 

@@ -18,6 +18,8 @@ import type {
   DeviceCountResponse,
   DriveFolderInfoResponse,
   ExternalBreachesResponse,
+  FacebookLeakSearchParams,
+  FacebookLeakSearchResponse,
   GetProfileNoPictureOptions,
   GetProfileOptions,
   OsintInfoResponse,
@@ -211,9 +213,9 @@ export class WhatsAppDataClient {
 
   /**
    * **Search** — advanced search over the phone-number database with filters
-   * (country, business, face analysis, date range, …). Zero matches resolve
-   * to an empty page (`success:false`, `data.docs:[]`) rather than throwing.
-   * `GET /phone-numbers/search`
+   * (country, business, WhatsApp username, face analysis, date range, …).
+   * Zero matches resolve to an empty page (`success:false`, `data.docs:[]`)
+   * rather than throwing. `GET /phone-numbers/search`
    */
   async search(
     params: SearchParams = {}
@@ -249,6 +251,50 @@ export class WhatsAppDataClient {
           latitude: params.latitude,
           longitude: params.longitude,
           radius: params.radius,
+          page: params.page,
+          limit: params.limit,
+        },
+        ...rc(params),
+      }
+    )
+    return data
+  }
+
+  /**
+   * **Facebook leak search** — search the 2019 Facebook leak by name, email,
+   * location, workplace or phone number. Each row is crossed with the
+   * WhatsApp cache by number (`whatsapp`, cache-only — never a live lookup)
+   * unless `whatsapp:false`. One credit per successful page.
+   * `GET /facebook-leak/search`
+   *
+   * **Direct API keys only** (the default `proxy` transport). It is not
+   * available on RapidAPI: on the `rapidapi` transport the API answers `403`
+   * (`code:'ENDPOINT_UNAVAILABLE'`), which surfaces as an {@link AuthError}.
+   *
+   * Errors carry the API's `code` in `error.body.code`:
+   * - `400` {@link HttpError} — `INVALID_PARAMETER`, `INVALID_NUMBER` or
+   *   `INVALID_QUERY` (out-of-range values are refused, not clamped).
+   * - `429` {@link RateLimitError} — `RATE_LIMITED` (30/min and 2,000/day per
+   *   key); `retryAfterMs` comes from `Retry-After`.
+   * - `502` `UPSTREAM_ERROR`, `503` `BUSY`, `504` `TOO_BROAD` (add words, a
+   *   `field` or `countryCode`) — {@link HttpError}. Like every 5xx on a GET
+   *   they are retried per `retries`; pass `retries: 0` to fail fast.
+   */
+  async searchFacebookLeak(
+    params: FacebookLeakSearchParams = {}
+  ): Promise<FacebookLeakSearchResponse> {
+    const { data } = await this.http.request<FacebookLeakSearchResponse>(
+      this.config.live,
+      '/facebook-leak/search',
+      {
+        query: {
+          q: params.q,
+          field: params.field,
+          number: params.number,
+          countryCode: params.countryCode,
+          gender: params.gender,
+          hasEmail: tri(params.hasEmail),
+          whatsapp: tri(params.whatsapp),
           page: params.page,
           limit: params.limit,
         },
@@ -518,15 +564,18 @@ function profileQuery(
 }
 
 /**
- * Build the search query. Filter booleans are serialized as explicit
- * `"true"`/`"false"` strings (NOT the presence-only `"1"` flag), so a `false`
- * filter like `isBusiness:false` is actually sent instead of being dropped.
+ * Serialize a filter boolean as an explicit `"true"`/`"false"` string (NOT the
+ * presence-only `"1"` flag), so a `false` filter like `isBusiness:false` is
+ * actually sent instead of being dropped. `undefined` is omitted.
  */
+function tri(v: boolean | undefined): string | undefined {
+  return v === undefined ? undefined : v ? 'true' : 'false'
+}
+
+/** Build the search query; filter booleans go through {@link tri}. */
 function searchQuery(
   p: SearchParams
 ): Record<string, string | number | boolean | undefined> {
-  const tri = (v: boolean | undefined): string | undefined =>
-    v === undefined ? undefined : v ? 'true' : 'false'
   return {
     page: p.page,
     limit: p.limit,
@@ -542,6 +591,8 @@ function searchQuery(
     faceMaxAge: p.faceMaxAge,
     facePeopleMin: p.facePeopleMin,
     facePeopleMax: p.facePeopleMax,
+    username: p.username,
+    hasUsername: tri(p.hasUsername),
     hasProfilePic: tri(p.hasProfilePic),
     isBusiness: tri(p.isBusiness),
     includeCount: tri(p.includeCount),

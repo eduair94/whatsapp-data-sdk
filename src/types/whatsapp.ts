@@ -143,6 +143,11 @@ export interface WhatsAppEntry {
   md5Image?: string
 
   name?: string
+  /**
+   * WhatsApp username (the @handle). Present only where WhatsApp has rolled
+   * out usernames and only when the account set one — most records have none.
+   */
+  username?: string
   pushname?: string
   shortName?: string
   type?: string

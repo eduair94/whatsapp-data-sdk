@@ -61,9 +61,9 @@ You can override any URL/host via `baseUrl`, `cacheBaseUrl`, `rapidApiHost`, `ra
 > checks and an official-business directory search. Profile data (display
 > name, about, photos) is omitted, and `getLastPicture`, `getTelegramProfile`,
 > `getPhoneBreaches`, `getPhoneBreachesExternal`, `getLeakedNumbersInfo`,
-> `downloadEntireDatabase`, `searchGoogleMaps` and `carrierLookupAlt` are
-> refused there. Use the default `proxy` transport with a direct API key for
-> those.
+> `downloadEntireDatabase`, `searchGoogleMaps`, `carrierLookupAlt` and
+> `searchFacebookLeak` are refused there. Use the default `proxy` transport
+> with a direct API key for those.
 
 ## 💸 Cache-first lookups (save money)
 
@@ -127,6 +127,61 @@ console.log(backup.driveFolder.url)
 ```
 
 > **Note:** `getLeakedNumbersInfo()` and `downloadEntireDatabase()` are restricted to **MEGA-tier keys** (500k+ request plans). Lower tiers get a `403` / `AuthError`.
+
+#### WhatsApp username
+
+Profiles and search rows carry `username` (the WhatsApp @handle) where
+WhatsApp has rolled out usernames and the account set one — most records have
+none. `search` can filter on it:
+
+```ts
+// Handle or its leading part; case-insensitive, a leading '@' is ignored.
+// Matches only the username, never a display name.
+const byHandle = await client.search({ username: 'frog' })
+console.log(byHandle.data.docs.map((d) => d.username)) // e.g. ['Frogdog_']
+
+// Only numbers that have a username (false = only numbers without one)
+await client.search({ countryCode: 'US', hasUsername: true })
+```
+
+### Facebook leak search
+
+`searchFacebookLeak` searches the 2019 Facebook leak by name, email, location,
+workplace or phone number. Each row is crossed with the WhatsApp cache by
+number (`row.whatsapp`: profile, username, business details, or
+`status: 'notOnWhatsapp'`) — a cache read only, never a live lookup.
+
+```ts
+const res = await client.searchFacebookLeak({
+  q: 'jane doe',       // ≤ 8 words, literal match; trailing * = prefix (3+ chars)
+  field: 'name',       // 'name' | 'email' | 'location' | 'work'
+  countryCode: 'US',
+  limit: 25,           // 1–100; page * limit ≤ 10,000
+})
+for (const row of res.data.docs) {
+  console.log(row.e164, row.firstName, row.lastName, row.whatsapp?.status, row.whatsapp?.username)
+}
+console.log(res.data.totalDocs, res.data.capped)
+
+// Exact number lookup (takes precedence over q); skip the WhatsApp cross-reference
+await client.searchFacebookLeak({ number: '15551234567', whatsapp: false })
+```
+
+Other filters: `gender` (`'male' | 'female'`), `hasEmail`, `page`. One credit
+per successful page.
+
+- **Direct API keys only** (default `proxy` transport). Not available on
+  RapidAPI: with `transport: 'rapidapi'` it answers `403`
+  (`ENDPOINT_UNAVAILABLE`) → `AuthError`.
+- Out-of-range values are refused with `400` (`INVALID_PARAMETER`,
+  `INVALID_NUMBER`, `INVALID_QUERY`), not clamped → `HttpError`.
+- `429` `RATE_LIMITED` (30/min and 2,000/day per key) → `RateLimitError` with
+  `retryAfterMs`.
+- `502` `UPSTREAM_ERROR`, `503` `BUSY`, `504` `TOO_BROAD` (add words, a
+  `field` or `countryCode`) → `HttpError`, retried like any 5xx GET; pass
+  `retries: 0` to fail fast.
+
+The API's error code is in `err.body.code`.
 
 ### Bulk checks
 
@@ -248,7 +303,7 @@ toE164('59898297150')       // '+59898297150' (bulk-DB endpoints; their validato
 
 ## Notes
 
-- This SDK covers exactly the marketplace endpoints (profile, breaches, pictures, device count, search, Google-Maps/proximity search, bulk checks, Telegram, database, carrier, OSINT).
+- This SDK covers exactly the marketplace endpoints (profile, breaches, pictures, device count, search, Google-Maps/proximity search, bulk checks, Telegram, database, carrier, OSINT), plus the direct-key-only Facebook leak search.
 - Enrichments run entirely server-side — you never supply Gemini, LeakCheck, or any other keys. Face analysis, breach lookups, etc. are handled by the API. The only user-provided key is your own checkleaked.cc key for `getPhoneBreachesExternal`.
 
 ## License

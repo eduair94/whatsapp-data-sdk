@@ -397,6 +397,176 @@ describe('search filter encoding', () => {
     expect(url).not.toContain('timeoutMs')
     expect(url).not.toContain('retries')
   })
+
+  it('sends the username filter as given and hasUsername explicitly', async () => {
+    const { client, calls } = make([{ json: { success: true, data: { docs: [] } } }])
+    await client.search({ username: '@frog', hasUsername: true })
+    const params = new URL(calls[0]!.url).searchParams
+    expect(params.get('username')).toBe('@frog')
+    expect(params.get('hasUsername')).toBe('true')
+
+    const { client: c2, calls: calls2 } = make([{ json: { success: true, data: { docs: [] } } }])
+    await c2.search({ hasUsername: false })
+    const params2 = new URL(calls2[0]!.url).searchParams
+    expect(params2.get('hasUsername')).toBe('false')
+    expect(params2.has('username')).toBe(false)
+  })
+
+  it('exposes username on search rows and profile entries', async () => {
+    const row = { number: '14155552671', exists: true, username: 'frogdog_' }
+    const { client } = make([
+      { json: { success: true, data: { docs: [row] } } },
+      { json: row },
+    ])
+    const page = await client.search({ username: 'frog' })
+    expect(page.data.docs[0]?.username).toBe('frogdog_')
+    const profile = await client.getProfile('14155552671')
+    expect(profile.username).toBe('frogdog_')
+  })
+})
+
+describe('searchFacebookLeak', () => {
+  const page = {
+    success: true,
+    data: {
+      docs: [
+        {
+          number: '15551234567',
+          e164: '+15551234567',
+          regionCode: 'US',
+          fbId: '100001',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          gender: 'female',
+          other: { location: 'Austin, Texas' },
+          facebookProfile: 'https://facebook.com/profile.php?id=100001',
+          whatsapp: {
+            status: 'found',
+            name: 'Jane',
+            username: 'janedoe',
+            isBusiness: true,
+            checkedAt: '2026-11-20T10:00:00.000Z',
+            business: { name: 'Jane Co', categories: 'Bakery, Cafe' },
+          },
+        },
+        { number: '15557654321', e164: '+15557654321', whatsapp: { status: 'notOnWhatsapp' } },
+      ],
+      totalDocs: 2,
+      capped: false,
+      page: 1,
+      limit: 25,
+      whatsappAvailable: true,
+    },
+  }
+
+  it('hits /facebook-leak/search on the proxy with every filter', async () => {
+    const { client, calls } = make([{ json: page }])
+    const res = await client.searchFacebookLeak({
+      q: 'jane doe',
+      field: 'name',
+      countryCode: 'US',
+      gender: 'female',
+      hasEmail: true,
+      page: 2,
+      limit: 50,
+    })
+    const url = new URL(calls[0]!.url)
+    expect(url.origin + url.pathname).toBe(
+      'https://whatsapp-proxy.checkleaked.cc/facebook-leak/search'
+    )
+    expect(calls[0]!.method).toBe('GET')
+    expect(calls[0]!.headers['x-rapidapi-key']).toBe('test-key')
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      q: 'jane doe',
+      field: 'name',
+      countryCode: 'US',
+      gender: 'female',
+      hasEmail: 'true',
+      page: '2',
+      limit: '50',
+    })
+    expect(res.data.totalDocs).toBe(2)
+    expect(res.data.whatsappAvailable).toBe(true)
+    const first = res.data.docs[0]!
+    expect(first.whatsapp?.status).toBe('found')
+    expect(first.whatsapp?.username).toBe('janedoe')
+    expect(first.whatsapp?.business?.categories).toBe('Bakery, Cafe')
+    expect(res.data.docs[1]!.whatsapp?.status).toBe('notOnWhatsapp')
+  })
+
+  it('sends whatsapp=false and hasEmail=false explicitly (not dropped)', async () => {
+    const { client, calls } = make([{ json: page }])
+    await client.searchFacebookLeak({ number: '15551234567', whatsapp: false, hasEmail: false })
+    const params = new URL(calls[0]!.url).searchParams
+    expect(params.get('number')).toBe('15551234567')
+    expect(params.get('whatsapp')).toBe('false')
+    expect(params.get('hasEmail')).toBe('false')
+  })
+
+  it('sends no query string without params and keeps request config out of it', async () => {
+    const { client, calls } = make([{ json: page }])
+    await client.searchFacebookLeak()
+    expect(calls[0]!.url).toBe('https://whatsapp-proxy.checkleaked.cc/facebook-leak/search')
+
+    const { client: c2, calls: calls2 } = make([{ json: page }])
+    await c2.searchFacebookLeak({ q: 'doe', timeoutMs: 5000, retries: 0 })
+    expect(calls2[0]!.url).toBe('https://whatsapp-proxy.checkleaked.cc/facebook-leak/search?q=doe')
+  })
+
+  it('maps 400 to HttpError carrying the API code', async () => {
+    const { client, calls } = make([
+      { status: 400, json: { success: false, code: 'INVALID_PARAMETER', error: 'limit must be between 1 and 100.' } },
+    ])
+    const err = await client.searchFacebookLeak({ limit: 500 }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err).toMatchObject({ status: 400, body: { code: 'INVALID_PARAMETER' } })
+    expect(calls).toHaveLength(1) // 4xx is not retried
+  })
+
+  it('maps the RapidAPI 403 ENDPOINT_UNAVAILABLE to AuthError', async () => {
+    const { client, calls } = make(
+      [{ status: 403, json: { success: false, code: 'ENDPOINT_UNAVAILABLE', error: 'direct API key only' } }],
+      { transport: 'rapidapi' }
+    )
+    const err = await client.searchFacebookLeak({ q: 'doe' }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(AuthError)
+    expect(err).toMatchObject({ status: 403, body: { code: 'ENDPOINT_UNAVAILABLE' } })
+    expect(calls[0]!.url).toContain('https://whatsapp-number-validator18.p.rapidapi.com/facebook-leak/search')
+  })
+
+  it('maps 429 RATE_LIMITED to RateLimitError with Retry-After', async () => {
+    const { client } = make(
+      [{ status: 429, json: { success: false, code: 'RATE_LIMITED', error: 'slow down' }, headers: { 'retry-after': '12' } }],
+      { retries: 0 }
+    )
+    const err = await client.searchFacebookLeak({ q: 'doe' }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(RateLimitError)
+    expect((err as RateLimitError).retryAfterMs).toBe(12000)
+    expect((err as RateLimitError).body).toMatchObject({ code: 'RATE_LIMITED' })
+  })
+
+  it('surfaces 504 TOO_BROAD as HttpError, with no retry when retries:0', async () => {
+    const { client, calls } = make([
+      { status: 504, json: { success: false, code: 'TOO_BROAD', error: 'Too many matches' } },
+    ])
+    const err = await client.searchFacebookLeak({ q: 'john', retries: 0 }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err).toMatchObject({ status: 504, body: { code: 'TOO_BROAD' } })
+    expect(calls).toHaveLength(1)
+  })
+
+  it('retries 503 BUSY like any 5xx GET', async () => {
+    const { client, calls } = make(
+      [
+        { status: 503, json: { success: false, code: 'BUSY', error: 'busy' }, headers: { 'retry-after': '5' } },
+        { json: page },
+      ],
+      { retryDelayMs: 1 }
+    )
+    const res = await client.searchFacebookLeak({ q: 'doe' })
+    expect(res.success).toBe(true)
+    expect(calls).toHaveLength(2)
+  })
 })
 
 describe('checkCached authoritative negative', () => {
