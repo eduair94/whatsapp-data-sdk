@@ -1,0 +1,57 @@
+{
+  "name": "whatsapp-checker",
+  "version": "1.0.0",
+  "description": "Official alias of whatsapp-data-sdk: check if a phone number is on WhatsApp and read its public profile (WhatsApp Data API by CheckLeaked).",
+  "main": "./index.cjs",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./index.d.ts",
+        "default": "./index.mjs"
+      },
+      "require": {
+        "types": "./index.d.ts",
+        "default": "./index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.cjs",
+    "index.mjs",
+    "index.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "whatsapp-data-sdk": "^1.5.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "whatsapp",
+    "whatsapp-checker",
+    "whatsapp-number-checker",
+    "phone",
+    "lookup",
+    "osint",
+    "checkleaked",
+    "sdk"
+  ],
+  "author": "Eduardo Airaudo (https://whatsapp.checkleaked.cc)",
+  "license": "MIT",
+  "homepage": "https://whatsapp.checkleaked.cc",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eduair94/whatsapp-data-sdk.git",
+    "directory": "alias/whatsapp-checker"
+  },
+  "bugs": {
+    "url": "https://github.com/eduair94/whatsapp-data-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
