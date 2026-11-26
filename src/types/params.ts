@@ -31,6 +31,17 @@ export interface GetProfileOptions extends RequestConfig {
   lookup?: boolean
   /** Include Google search results for the number. */
   google?: boolean
+  /**
+   * Include the LinkedIn profiles (at most 3) whose phone matches the number,
+   * under `linkedin` on the entry: `{ success: true, profiles, count }`, or
+   * `{ error, success: null }` on a miss or while the index is unavailable
+   * (the lookup itself never fails because of it).
+   *
+   * Returned by the direct API (the default `proxy` transport) and by the
+   * RapidAPI "WP Data" / "WP Data DB Only" listings. The "Number Validator"
+   * listing (the `rapidapi` transport's live host) does not return it.
+   */
+  linkedin?: boolean
   /** Include phone carrier information. */
   includeCarrier?: boolean
   /** Skip profile-picture processing entirely (faster). */
@@ -158,6 +169,61 @@ export interface FacebookLeakSearchParams extends RequestConfig {
   page?: number
   /** Rows per page, 1–100 (default 25). */
   limit?: number
+}
+
+/** Kind of contact data `has` can require in {@link LinkedInSearchParams}. */
+export type LinkedInHasFilter = 'phones' | 'emails'
+
+/**
+ * Parameters for `searchLinkedIn` (`GET /linkedin/search`).
+ *
+ * The API refuses out-of-range values with a `400` (it does not clamp them).
+ * All filters are combined with AND.
+ */
+export interface LinkedInSearchParams extends RequestConfig {
+  /**
+   * Free text, up to 200 characters and 8 words (a name, job title, skill…).
+   * Every word is matched literally (operators and `field:value` terms have no
+   * effect). A word with 7 or more digits in a row, or made only of digits and
+   * phone punctuation with 7 or more digits in all, is refused with a `400`:
+   * look phone numbers up with `number`. Omit it to browse by filters.
+   */
+  q?: string
+  /**
+   * Phone lookup with country code (8–15 digits, digits and a leading `+`
+   * only). Returns the profiles that list the number (at most 10, no paging).
+   * Takes precedence over `q` and the filters.
+   */
+  number?: string
+  /** ISO 3166-1 alpha-2 country of the profile, e.g. `'US'`. */
+  country?: string
+  /** Industry, as the dataset spells it (e.g. `'Computer Software'`). */
+  industry?: string
+  /** Job role (e.g. `'engineering'`). */
+  jobRole?: string
+  /** Company size band, as the dataset spells it (e.g. `'51-200'`). */
+  companySize?: string
+  /** Inferred salary band, as the dataset spells it. */
+  salary?: string
+  /** Company name. */
+  company?: string
+  /**
+   * Only profiles that have this kind of contact data. Sent as repeated keys
+   * (`has=phones&has=emails`); several values are combined with AND.
+   */
+  has?: LinkedInHasFilter[]
+  /**
+   * Paging cursor: pass the previous page's `data.nextCursor`. Omit it for the
+   * first page.
+   */
+  cursor?: number
+  /** Profiles per page, 1–100 (default 25; at most 10 with `number`). */
+  limit?: number
+  /**
+   * Cross each profile's phone numbers with the WhatsApp cache (default
+   * `true` on the API). Pass `false` to skip it.
+   */
+  whatsapp?: boolean
 }
 
 /** Parameters for `searchGoogleMaps` (`GET /phone-numbers/proximity/search`). */

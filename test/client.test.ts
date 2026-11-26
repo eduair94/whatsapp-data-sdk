@@ -9,6 +9,7 @@ import {
   WhatsAppDataError,
   type FetchLike,
 } from '../src/index.js'
+import { buildQuery } from '../src/utils.js'
 import { mockFetch, type MockResponse } from './mock.js'
 
 /** An AbortError with the right `.name` (what fetch throws on abort). */
@@ -53,6 +54,68 @@ describe('getProfile', () => {
     expect(calls[0]!.url).toContain('telegram=1')
     expect(calls[0]!.url).toContain('google=1')
     expect(calls[0]!.url).not.toContain('base64')
+  })
+
+  it('sends linkedin=1 and types the linkedin result on the entry', async () => {
+    const hit = {
+      number: '59898297150',
+      exists: true,
+      linkedin: {
+        success: true,
+        count: 1,
+        profiles: [
+          {
+            linkedinUrl: 'https://www.linkedin.com/in/jane-doe',
+            fullName: 'Jane Doe',
+            firstName: 'Jane',
+            lastName: 'Doe',
+            jobTitle: 'Data Engineer',
+            company: 'Acme',
+            industry: 'Computer Software',
+            country: 'Uruguay',
+            location: 'Montevideo',
+            skills: null,
+            summary: null,
+            details: { emails: ['jane@acme.test'] },
+          },
+        ],
+      },
+    }
+    const { client, calls } = make([{ json: hit }])
+    const res = await client.getProfile('59898297150', { linkedin: true })
+    expect(new URL(calls[0]!.url).searchParams.get('linkedin')).toBe('1')
+    const li = res.linkedin
+    if (li?.success === true) {
+      expect(li.count).toBe(1)
+      expect(li.profiles[0]!.fullName).toBe('Jane Doe')
+      expect(li.profiles[0]!.details?.emails).toEqual(['jane@acme.test'])
+    } else {
+      throw new Error('expected a LinkedIn hit')
+    }
+  })
+
+  it('types a LinkedIn miss as { error, success: null }', async () => {
+    const { client } = make([
+      {
+        json: {
+          number: '59898297150',
+          exists: true,
+          linkedin: { error: 'No LinkedIn profile for this number', success: null },
+        },
+      },
+    ])
+    const res = await client.getProfile('59898297150', { linkedin: true })
+    const li = res.linkedin
+    expect(li?.success).toBeNull()
+    if (li && li.success === null) expect(li.error).toMatch(/No LinkedIn profile/)
+  })
+
+  it('omits linkedin unless it is true', async () => {
+    const { client, calls } = make([{ json: {} }])
+    await client.getProfile('59898297150', { linkedin: false })
+    await client.getProfile('59898297150')
+    expect(calls[0]!.url).not.toContain('linkedin')
+    expect(calls[1]!.url).not.toContain('linkedin')
   })
 })
 
@@ -566,6 +629,205 @@ describe('searchFacebookLeak', () => {
     const res = await client.searchFacebookLeak({ q: 'doe' })
     expect(res.success).toBe(true)
     expect(calls).toHaveLength(2)
+  })
+})
+
+describe('searchLinkedIn', () => {
+  const page = {
+    success: true,
+    data: {
+      docs: [
+        {
+          id: 101,
+          linkedinUrl: 'https://www.linkedin.com/in/jane-doe',
+          fullName: 'Jane Doe',
+          firstName: 'Jane',
+          lastName: 'Doe',
+          jobTitle: 'Data Engineer',
+          company: 'Acme',
+          industry: 'Computer Software',
+          country: 'Uruguay',
+          location: 'Montevideo',
+          skills: null,
+          summary: null,
+          details: { phones: ['+59899123456'], emails: ['jane@acme.test'] },
+          whatsapp: {
+            checked: true,
+            onWhatsapp: true,
+            numbers: [
+              {
+                number: '+59899123456',
+                status: 'found',
+                summary: {
+                  status: 'found',
+                  name: 'Jane',
+                  username: 'janedoe',
+                  isBusiness: false,
+                  checkedAt: '2026-11-20T10:00:00.000Z',
+                },
+              },
+              { number: '+59899000000', status: 'absent' },
+            ],
+          },
+        },
+        {
+          id: 102,
+          linkedinUrl: null,
+          fullName: 'No Phone',
+          firstName: null,
+          lastName: null,
+          jobTitle: null,
+          company: null,
+          industry: null,
+          country: null,
+          location: null,
+          skills: null,
+          summary: null,
+          details: null,
+        },
+      ],
+      totalDocs: 2,
+      capped: false,
+      nextCursor: 102,
+      limit: 25,
+      whatsappAvailable: true,
+      indexComplete: true,
+    },
+  }
+
+  it('hits /linkedin/search with repeated has, cursor and whatsapp=false', async () => {
+    const { client, calls } = make([{ json: page }])
+    await client.searchLinkedIn({
+      country: 'UY',
+      has: ['phones', 'emails'],
+      cursor: 10,
+      whatsapp: false,
+    })
+    const url = new URL(calls[0]!.url)
+    expect(url.origin + url.pathname).toBe(
+      'https://whatsapp-proxy.checkleaked.cc/linkedin/search'
+    )
+    expect(calls[0]!.method).toBe('GET')
+    expect(calls[0]!.headers['x-rapidapi-key']).toBe('test-key')
+    expect(url.searchParams.get('country')).toBe('UY')
+    expect(url.searchParams.getAll('has')).toEqual(['phones', 'emails'])
+    // repeated keys, not a comma list or has[]
+    expect(url.search).toContain('has=phones&has=emails')
+    expect(url.searchParams.get('cursor')).toBe('10')
+    expect(url.searchParams.get('whatsapp')).toBe('false')
+  })
+
+  it('sends every filter', async () => {
+    const { client, calls } = make([{ json: page }])
+    await client.searchLinkedIn({
+      q: 'data engineer',
+      number: '+59899123456',
+      country: 'UY',
+      industry: 'Computer Software',
+      jobRole: 'engineering',
+      companySize: '51-200',
+      salary: '$100k-$150k',
+      company: 'Acme',
+      has: ['phones'],
+      cursor: 0,
+      limit: 50,
+      whatsapp: true,
+    })
+    expect(Object.fromEntries(new URL(calls[0]!.url).searchParams)).toEqual({
+      q: 'data engineer',
+      number: '+59899123456',
+      country: 'UY',
+      industry: 'Computer Software',
+      jobRole: 'engineering',
+      companySize: '51-200',
+      salary: '$100k-$150k',
+      company: 'Acme',
+      has: 'phones',
+      cursor: '0', // a first-page cursor of 0 is sent, not dropped
+      limit: '50',
+      whatsapp: 'true',
+    })
+  })
+
+  it('sends no query string without params; an empty has is dropped; request config stays out', async () => {
+    const { client, calls } = make([{ json: page }])
+    await client.searchLinkedIn()
+    expect(calls[0]!.url).toBe('https://whatsapp-proxy.checkleaked.cc/linkedin/search')
+
+    const { client: c2, calls: calls2 } = make([{ json: page }])
+    await c2.searchLinkedIn({ q: 'engineer', has: [], timeoutMs: 5000, retries: 0 })
+    expect(calls2[0]!.url).toBe('https://whatsapp-proxy.checkleaked.cc/linkedin/search?q=engineer')
+  })
+
+  it('returns the typed page: profiles, WhatsApp cross-reference, cursor', async () => {
+    const { client } = make([{ json: page }])
+    const res = await client.searchLinkedIn({ q: 'engineer' })
+    expect(res.success).toBe(true)
+    expect(res.data.totalDocs).toBe(2)
+    expect(res.data.capped).toBe(false)
+    expect(res.data.nextCursor).toBe(102)
+    expect(res.data.whatsappAvailable).toBe(true)
+    expect(res.data.indexComplete).toBe(true)
+    const first = res.data.docs[0]!
+    expect(first.id).toBe(101)
+    expect(first.fullName).toBe('Jane Doe')
+    expect(first.whatsapp?.onWhatsapp).toBe(true)
+    expect(first.whatsapp?.numbers[0]!.status).toBe('found')
+    expect(first.whatsapp?.numbers[0]!.summary?.username).toBe('janedoe')
+    expect(first.whatsapp?.numbers[1]!.status).toBe('absent')
+    expect(first.whatsapp?.numbers[1]!.summary).toBeUndefined()
+    expect(res.data.docs[1]!.whatsapp).toBeUndefined()
+    expect(res.data.docs[1]!.details).toBeNull()
+  })
+
+  it('maps 400 to HttpError carrying the API code (phone-like q is refused)', async () => {
+    const { client, calls } = make([
+      { status: 400, json: { success: false, code: 'INVALID_PARAMETER', error: 'q looks like a phone number; use number' } },
+    ])
+    const err = await client.searchLinkedIn({ q: '59899123456' }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err).toMatchObject({ status: 400, body: { code: 'INVALID_PARAMETER' } })
+    expect(calls).toHaveLength(1) // 4xx is not retried
+  })
+
+  it('maps the RapidAPI 403 ENDPOINT_UNAVAILABLE to AuthError', async () => {
+    const { client, calls } = make(
+      [{ status: 403, json: { success: false, code: 'ENDPOINT_UNAVAILABLE', error: 'direct API key only' } }],
+      { transport: 'rapidapi' }
+    )
+    const err = await client.searchLinkedIn({ q: 'engineer' }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(AuthError)
+    expect(err).toMatchObject({ status: 403, body: { code: 'ENDPOINT_UNAVAILABLE' } })
+    expect(calls[0]!.url).toContain('https://whatsapp-number-validator18.p.rapidapi.com/linkedin/search')
+  })
+
+  it('maps 429 RATE_LIMITED to RateLimitError with Retry-After', async () => {
+    const { client } = make(
+      [{ status: 429, json: { success: false, code: 'RATE_LIMITED', error: 'slow down' }, headers: { 'retry-after': '7' } }],
+      { retries: 0 }
+    )
+    const err = await client.searchLinkedIn({ q: 'engineer' }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(RateLimitError)
+    expect((err as RateLimitError).retryAfterMs).toBe(7000)
+    expect((err as RateLimitError).body).toMatchObject({ code: 'RATE_LIMITED' })
+  })
+
+  it('surfaces 504 TOO_BROAD as HttpError, with no retry when retries:0', async () => {
+    const { client, calls } = make([
+      { status: 504, json: { success: false, code: 'TOO_BROAD', error: 'Too many matches' } },
+    ])
+    const err = await client.searchLinkedIn({ q: 'engineer', retries: 0 }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err).toMatchObject({ status: 504, body: { code: 'TOO_BROAD' } })
+    expect(calls).toHaveLength(1)
+  })
+})
+
+describe('buildQuery arrays', () => {
+  it('repeats the key for each array value and skips empty arrays', () => {
+    expect(buildQuery({ has: ['phones', 'emails'], n: 1 })).toBe('?has=phones&has=emails&n=1')
+    expect(buildQuery({ has: [] })).toBe('')
+    expect(buildQuery({ ids: [1, 2] })).toBe('?ids=1&ids=2')
   })
 })
 

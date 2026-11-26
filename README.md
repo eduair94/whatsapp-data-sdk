@@ -61,8 +61,9 @@ You can override any URL/host via `baseUrl`, `cacheBaseUrl`, `rapidApiHost`, `ra
 > checks and an official-business directory search. Profile data (display
 > name, about, photos) is omitted, and `getLastPicture`, `getTelegramProfile`,
 > `getPhoneBreaches`, `getPhoneBreachesExternal`, `getLeakedNumbersInfo`,
-> `downloadEntireDatabase`, `searchGoogleMaps`, `carrierLookupAlt` and
-> `searchFacebookLeak` are refused there. Use the default `proxy` transport
+> `downloadEntireDatabase`, `searchGoogleMaps`, `carrierLookupAlt`,
+> `searchFacebookLeak` and `searchLinkedIn` are refused there, and it does not
+> return the `linkedin` profile-lookup flag. Use the default `proxy` transport
 > with a direct API key for those.
 
 ## 💸 Cache-first lookups (save money)
@@ -97,7 +98,7 @@ await client.getDeviceCount(number)                  // Device count
 await client.getOsintInfo(number)                    // OSINT Info
 ```
 
-`getProfile` options include `telegram`, `google`, `lookup`, `includeCarrier`, `base64`, `geminiFaceAnalysis`, `reverseImageSearch`, `fullAiReport`, `includeDeviceCount`, `onlyCheck`, `useCache`, `forceBypassCache`, and more.
+`getProfile` options include `telegram`, `google`, `lookup`, `linkedin` (LinkedIn profiles for the number — [see below](#linkedin-on-a-profile-lookup)), `includeCarrier`, `base64`, `geminiFaceAnalysis`, `reverseImageSearch`, `fullAiReport`, `includeDeviceCount`, `onlyCheck`, `useCache`, `forceBypassCache`, and more.
 
 ```ts
 const pic = await client.getLastPicture('59898297150')
@@ -182,6 +183,79 @@ per successful page.
   `retries: 0` to fail fast.
 
 The API's error code is in `err.body.code`.
+
+### LinkedIn search
+
+`searchLinkedIn` searches the LinkedIn profile dataset by words, filters or
+phone number. Each profile carries `details` (emails, phones and other source
+columns) and, when it has a valid phone number, a `whatsapp` cross-reference:
+per number, the WhatsApp cache's record (profile, username, business details),
+`status: 'notOnWhatsapp'` (checked, no account) or `status: 'absent'` (never
+checked) — a cache read only, never a live lookup.
+
+```ts
+const res = await client.searchLinkedIn({
+  q: 'data engineer',          // ≤ 8 words, matched literally
+  country: 'UY',               // ISO 3166-1 alpha-2
+  has: ['phones', 'emails'],   // only profiles with phones AND emails
+  limit: 25,                   // 1–100
+})
+for (const p of res.data.docs) {
+  console.log(p.fullName, p.jobTitle, p.company, p.whatsapp?.onWhatsapp)
+}
+
+// Cursor paging: send the previous nextCursor (null on the last page)
+let cursor: number | null = res.data.nextCursor
+while (cursor !== null) {
+  const next = await client.searchLinkedIn({ q: 'data engineer', country: 'UY', cursor })
+  cursor = next.data.nextCursor
+}
+
+// Look one phone number up (country code included; takes precedence over q and
+// the filters; at most 10 profiles, no paging). Skip the WhatsApp cross-reference:
+await client.searchLinkedIn({ number: '+59899123456', whatsapp: false })
+```
+
+Other filters: `industry`, `jobRole`, `companySize`, `salary`, `company`.
+`res.data.totalDocs` is the match count, a lower bound when `capped` is `true`
+(and `null` when the service gave none); `indexComplete: false` means the
+dataset is still being indexed and the newest profiles may be missing.
+
+- **Direct API keys only** (default `proxy` transport). Not available on
+  RapidAPI: with `transport: 'rapidapi'` it answers `403`
+  (`ENDPOINT_UNAVAILABLE`) → `AuthError`.
+- A `q` word with 7+ digits (or made only of digits and phone punctuation) is
+  refused with `400` — look phone numbers up with `number`. Out-of-range
+  values are refused too (`INVALID_PARAMETER`, `INVALID_NUMBER`,
+  `INVALID_QUERY`), not clamped → `HttpError`.
+- `429` `RATE_LIMITED` (30/min and 2,000/day per key) → `RateLimitError` with
+  `retryAfterMs`.
+- `502` `UPSTREAM_ERROR`, `503` `BUSY`/`UNAVAILABLE`, `504` `TOO_BROAD` (add
+  words or filters) → `HttpError`, retried like any 5xx GET; pass
+  `retries: 0` to fail fast.
+
+The API's error code is in `err.body.code`.
+
+#### LinkedIn on a profile lookup
+
+`getProfile` takes `linkedin: true` to add the LinkedIn profiles (at most 3)
+whose phone matches the number, under `linkedin` on the entry:
+
+```ts
+const entry = await client.getProfile('59898297150', { linkedin: true })
+const li = entry.linkedin
+if (li?.success) {
+  console.log(li.count, li.profiles.map((p) => p.fullName))
+} else if (li) {
+  console.log(li.error) // e.g. 'No LinkedIn profile for this number' (success: null)
+}
+```
+
+A miss, or an index that is unavailable, answers `{ error, success: null }`;
+the lookup itself never fails because of it. Available on the direct API (the
+default `proxy` transport) and the RapidAPI "WP Data" / "WP Data DB Only"
+listings; the "Number Validator" listing, which the `rapidapi` transport's live
+host points at, does not return it.
 
 ### Bulk checks
 
@@ -303,7 +377,7 @@ toE164('59898297150')       // '+59898297150' (bulk-DB endpoints; their validato
 
 ## Notes
 
-- This SDK covers exactly the marketplace endpoints (profile, breaches, pictures, device count, search, Google-Maps/proximity search, bulk checks, Telegram, database, carrier, OSINT), plus the direct-key-only Facebook leak search.
+- This SDK covers exactly the marketplace endpoints (profile, breaches, pictures, device count, search, Google-Maps/proximity search, bulk checks, Telegram, database, carrier, OSINT), plus the direct-key-only Facebook leak search and LinkedIn search.
 - Enrichments run entirely server-side — you never supply Gemini, LeakCheck, or any other keys. Face analysis, breach lookups, etc. are handled by the API. The only user-provided key is your own checkleaked.cc key for `getPhoneBreachesExternal`.
 
 ## License

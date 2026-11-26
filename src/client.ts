@@ -22,6 +22,8 @@ import type {
   FacebookLeakSearchResponse,
   GetProfileNoPictureOptions,
   GetProfileOptions,
+  LinkedInSearchParams,
+  LinkedInSearchResponse,
   OsintInfoResponse,
   PaginatedResponse,
   PhoneBreachesResponse,
@@ -305,6 +307,61 @@ export class WhatsAppDataClient {
   }
 
   /**
+   * **LinkedIn search** — search the LinkedIn profile dataset by words,
+   * filters or phone number. Each profile carries `details` (emails, phones
+   * and other source columns) and, when it has a valid phone number, a
+   * `whatsapp` cross-reference: per number, the WhatsApp cache's record
+   * (profile, username, business details), `status:'notOnWhatsapp'` or
+   * `status:'absent'` — a cache read only, never a live lookup — unless
+   * `whatsapp:false`. `GET /linkedin/search`
+   *
+   * Pages follow a cursor: pass the previous `data.nextCursor` as `cursor`
+   * (`null` on the last page). `number` looks one phone number up (at most
+   * 10 profiles, no paging).
+   *
+   * **Direct API keys only** (the default `proxy` transport). It is not
+   * available on RapidAPI: on the `rapidapi` transport the API answers `403`
+   * (`code:'ENDPOINT_UNAVAILABLE'`), which surfaces as an {@link AuthError}.
+   *
+   * Errors carry the API's `code` in `error.body.code`:
+   * - `400` {@link HttpError} — `INVALID_PARAMETER`, `INVALID_NUMBER` or
+   *   `INVALID_QUERY` (out-of-range values are refused, not clamped; so is a
+   *   `q` word that looks like a phone number — use `number`).
+   * - `429` {@link RateLimitError} — `RATE_LIMITED` (30/min and 2,000/day per
+   *   key); `retryAfterMs` comes from `Retry-After`.
+   * - `502` `UPSTREAM_ERROR`, `503` `BUSY`/`UNAVAILABLE`, `504` `TOO_BROAD`
+   *   (add words or filters) — {@link HttpError}. Like every 5xx on a GET
+   *   they are retried per `retries`; pass `retries: 0` to fail fast.
+   */
+  async searchLinkedIn(
+    params: LinkedInSearchParams = {}
+  ): Promise<LinkedInSearchResponse> {
+    const { data } = await this.http.request<LinkedInSearchResponse>(
+      this.config.live,
+      '/linkedin/search',
+      {
+        query: {
+          q: params.q,
+          number: params.number,
+          country: params.country,
+          industry: params.industry,
+          jobRole: params.jobRole,
+          companySize: params.companySize,
+          salary: params.salary,
+          company: params.company,
+          // Repeated keys: has=phones&has=emails
+          has: params.has,
+          cursor: params.cursor,
+          limit: params.limit,
+          whatsapp: tri(params.whatsapp),
+        },
+        ...rc(params),
+      }
+    )
+    return data
+  }
+
+  /**
    * **Leaked Numbers (500M database)** — get access to the full leaked-numbers
    * dataset. Returns a JSON payload with a Google Drive folder link to the
    * data (not the rows inline). `GET /leaks/info`
@@ -546,6 +603,7 @@ function profileQuery(
     base64: o.base64,
     lookup: o.lookup,
     google: o.google,
+    linkedin: o.linkedin,
     includeCarrier: o.includeCarrier,
     ignoreProfilePic: o.ignoreProfilePic,
     includeUpdatedPictureHistory: o.includeUpdatedPictureHistory,

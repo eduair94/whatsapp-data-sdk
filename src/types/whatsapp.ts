@@ -1,4 +1,4 @@
-import type { TelegramNumberResult } from './responses.js'
+import type { LinkedInLookupResult, TelegramNumberResult } from './responses.js'
 
 /**
  * Core WhatsApp entity types.
@@ -167,6 +167,12 @@ export interface WhatsAppEntry {
   carrierData?: EmbeddedCarrierData
   /** Telegram data, present when the profile lookup requested `telegram`. */
   telegram?: TelegramNumberResult
+  /**
+   * LinkedIn profiles matching the number, present when the profile lookup
+   * requested `linkedin`. Narrow on `success`: `true` = `profiles` (at most 3)
+   * and `count`; `null` = `error` (no match, or the index is unavailable).
+   */
+  linkedin?: LinkedInLookupResult
   /** Metadata describing how/when this record was checked. */
   checkMetadata?: Record<string, unknown>
 

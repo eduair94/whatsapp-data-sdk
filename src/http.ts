@@ -7,14 +7,17 @@ import {
   TimeoutError,
   WhatsAppDataError,
 } from './errors.js'
-import { buildQuery } from './utils.js'
+import { buildQuery, type QueryValue } from './utils.js'
 
 export type HttpMethod = 'GET' | 'POST'
 
 export interface RequestOptions {
   method?: HttpMethod
-  /** Query params (booleans become the API's `"1"` flags). */
-  query?: Record<string, string | number | boolean | undefined | null>
+  /**
+   * Query params (booleans become the API's `"1"` flags; arrays are sent as
+   * the key repeated per item).
+   */
+  query?: Record<string, QueryValue>
   /** JSON request body (POST). */
   body?: unknown
   /** `'json'` (default) parses JSON; `'bytes'` returns raw binary. */

@@ -365,6 +365,122 @@ export interface FacebookLeakSearchResponse {
   data: FacebookLeakSearchData
 }
 
+/* ── LinkedIn ──────────────────────────────────────────────────────────── */
+
+/**
+ * A LinkedIn profile, as returned by the `linkedin` profile-lookup flag and by
+ * `searchLinkedIn`. Any field can be `null` when the source has no value.
+ */
+export interface LinkedInProfile {
+  linkedinUrl: string | null
+  fullName: string | null
+  firstName: string | null
+  lastName: string | null
+  jobTitle: string | null
+  company: string | null
+  industry: string | null
+  country: string | null
+  location: string | null
+  skills: string | null
+  summary: string | null
+  /**
+   * Further source columns as the index stores them (snake_case), e.g.
+   * `emails`, `phones`, `mobile`, `gender`, `job_start_date`,
+   * `company_website`, `facebook_url`, `twitter_url`, `github_url`,
+   * `locality`, `region`.
+   */
+  details: Record<string, unknown> | null
+}
+
+/** The `linkedin` result on an entry when profiles matched the number. */
+export interface LinkedInLookupHit {
+  success: true
+  /** At most 3 profiles. */
+  profiles: LinkedInProfile[]
+  count: number
+}
+
+/**
+ * The `linkedin` result when nothing matched, or the index was unavailable
+ * (e.g. `"No LinkedIn profile for this number"`). The lookup itself still
+ * succeeds.
+ */
+export interface LinkedInLookupMiss {
+  error: string
+  success: null
+}
+
+/**
+ * `WhatsAppEntry.linkedin` — present when `getProfile` was called with
+ * `linkedin:true`. Narrow on `success` (`true` = hit, `null` = miss).
+ */
+export type LinkedInLookupResult = LinkedInLookupHit | LinkedInLookupMiss
+
+/**
+ * What the WhatsApp cache holds for a number of a LinkedIn profile. Same shape
+ * as {@link FacebookLeakWhatsAppSummary}.
+ */
+export type LinkedInWhatsAppSummary = FacebookLeakWhatsAppSummary
+
+/** One phone number of a LinkedIn profile, crossed with the WhatsApp cache. */
+export interface LinkedInWhatsAppNumber {
+  /** The profile's number, in E.164 (`+` and digits). */
+  number: string
+  /**
+   * `'found'` = a WhatsApp account; `'notOnWhatsapp'` = checked, no account;
+   * `'absent'` = the number was never checked on WhatsApp.
+   */
+  status: 'found' | 'notOnWhatsapp' | 'absent'
+  /** The WhatsApp record; absent when `status` is `'absent'`. */
+  summary?: LinkedInWhatsAppSummary
+}
+
+/** The WhatsApp cross-reference of a {@link LinkedInSearchItem}. */
+export interface LinkedInWhatsAppInfo {
+  /** At least one of the numbers has a record in the WhatsApp dataset. */
+  checked: boolean
+  /** At least one of the numbers has a WhatsApp account. */
+  onWhatsapp: boolean
+  numbers: LinkedInWhatsAppNumber[]
+}
+
+/** One row of `searchLinkedIn`. */
+export interface LinkedInSearchItem extends LinkedInProfile {
+  /** The profile's id in the dataset (the paging cursor is the last id of a page). */
+  id: number
+  /**
+   * Absent when the profile has no valid phone number, or the cross-reference
+   * was skipped (`whatsapp:false`) or unavailable (see `whatsappAvailable`).
+   */
+  whatsapp?: LinkedInWhatsAppInfo
+}
+
+/** The page carried by {@link LinkedInSearchResponse}. */
+export interface LinkedInSearchData {
+  docs: LinkedInSearchItem[]
+  /**
+   * Number of matches; a lower bound when `capped` is `true`. `null` when the
+   * service gave none.
+   */
+  totalDocs: number | null
+  /** `true` when counting stopped early, so `totalDocs` is a lower bound. */
+  capped: boolean
+  /** Send as `cursor` for the next page; `null` on the last page. */
+  nextCursor: number | null
+  /** Profiles asked for per page (at most 10 for a `number` lookup). */
+  limit: number
+  /** `false` when the WhatsApp cross-reference was skipped or could not be read. */
+  whatsappAvailable: boolean
+  /** `false` while the dataset is still being indexed: the newest profiles may be missing. */
+  indexComplete: boolean
+}
+
+/** Response of `searchLinkedIn` (`GET /linkedin/search`). */
+export interface LinkedInSearchResponse {
+  success: boolean
+  data: LinkedInSearchData
+}
+
 /* ── Database / leak downloads (Drive links) ──────────────────────────── */
 
 /**
