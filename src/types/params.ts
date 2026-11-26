@@ -38,8 +38,8 @@ export interface GetProfileOptions extends RequestConfig {
    * (the lookup itself never fails because of it).
    *
    * Returned by the direct API (the default `proxy` transport) and by the
-   * RapidAPI "WP Data" / "WP Data DB Only" listings. The "Number Validator"
-   * listing (the `rapidapi` transport's live host) does not return it.
+   * RapidAPI "Number Validator" (the `rapidapi` transport's live host, since
+   * 2026-11-26) and "WP Data DB Only" listings.
    */
   linkedin?: boolean
   /** Include phone carrier information. */

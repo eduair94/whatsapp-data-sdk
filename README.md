@@ -56,15 +56,13 @@ You can override any URL/host via `baseUrl`, `cacheBaseUrl`, `rapidApiHost`, `ra
 
 > **RapidAPI live host = the "Whatsapp Number Validator" listing.** The former
 > `wp-data.p.rapidapi.com` listing was removed from RapidAPI in November 2026.
-> The validator listing is a separate subscription that returns validation
-> data only: registration checks, carrier, device count, cache reads, bulk
-> checks and an official-business directory search. Profile data (display
-> name, about, photos) is omitted, and `getLastPicture`, `getTelegramProfile`,
-> `getPhoneBreaches`, `getPhoneBreachesExternal`, `getLeakedNumbersInfo`,
-> `downloadEntireDatabase`, `searchGoogleMaps`, `carrierLookupAlt`,
-> `searchFacebookLeak` and `searchLinkedIn` are refused there, and it does not
-> return the `linkedin` profile-lookup flag. Use the default `proxy` transport
-> with a direct API key for those.
+> Since 2026-11-26 the validator listing returns the same records as a direct
+> API key: display name, about, photos, business data, carrier, Telegram,
+> Google, breaches and the `linkedin` flag, with bulk checks and searches.
+> Still refused there: `searchFacebookLeak`, `searchLinkedIn`,
+> `getLeakedNumbersInfo` and `downloadEntireDatabase`. The
+> `geminiFaceAnalysis`, `reverseImageSearch` and `fullAiReport` options are
+> ignored. Use the default `proxy` transport with a direct API key for those.
 
 ## 💸 Cache-first lookups (save money)
 

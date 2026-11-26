@@ -51,8 +51,8 @@ export type CachedLookupResult = WhatsAppEntry & {
  * ```
  *
  * The default `proxy` transport talks to `whatsapp-proxy.checkleaked.cc`. Pass
- * `transport: 'rapidapi'` to use the `wp-data` / `wp-data-db-only` RapidAPI
- * hosts instead.
+ * `transport: 'rapidapi'` to use the RapidAPI hosts instead
+ * (`whatsapp-number-validator18` live, `wp-data-db-only` cache).
  *
  * Every method accepts a trailing options object extending {@link RequestConfig}
  * (`signal`, `timeoutMs`, `retries`) for per-call cancellation and tuning.
