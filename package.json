@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-data-sdk",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "TypeScript SDK for the WhatsApp Data API (checkleaked.cc / RapidAPI): profile info, phone breaches, carrier lookup, Telegram, OSINT, bulk checks and a money-saving cache-first lookup.",
   "keywords": [
     "whatsapp",
