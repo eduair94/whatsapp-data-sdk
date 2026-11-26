@@ -47,8 +47,10 @@ const sleep = (ms: number): Promise<void> =>
 /** URL with the query string removed — safe to put in errors/logs. */
 const redactUrl = (url: string): string => url.split('?')[0] ?? url
 
-/** Upper bound on how long we'll honor a `Retry-After` before a retry. */
+/** Upper bound on the `retryAfterMs` an error reports. */
 const MAX_RETRY_AFTER_MS = 60_000
+/** Longest wait a `Retry-After` imposes before an automatic retry. */
+const MAX_RETRY_WAIT_MS = 30_000
 
 /**
  * Thin HTTP layer over `fetch`: builds URLs, injects auth headers, enforces a
@@ -98,15 +100,7 @@ export class HttpTransport {
 
     let lastError: unknown
     for (let attempt = 0; attempt <= retries; attempt++) {
-      if (attempt > 0) {
-        const backoff = this.config.retryDelayMs * 2 ** (attempt - 1)
-        // Honor a server-provided Retry-After (429) when it's longer.
-        const delay =
-          lastError instanceof RateLimitError && lastError.retryAfterMs
-            ? Math.max(lastError.retryAfterMs, backoff)
-            : backoff
-        await sleep(delay)
-      }
+      if (attempt > 0) await sleep(this.retryDelay(lastError, attempt))
       try {
         return await this.attempt<T>(url, {
           method,
@@ -257,7 +251,25 @@ export class HttpTransport {
       status,
       body,
       url,
+      retryAfterMs:
+        status === 503 ? parseRetryAfter(headers?.get('retry-after')) : undefined,
     })
+  }
+
+  /**
+   * Wait before retry number `attempt`: the server's `Retry-After` on a 429 or
+   * 503 (at most MAX_RETRY_WAIT_MS), else exponential backoff from
+   * `retryDelayMs`.
+   */
+  private retryDelay(err: unknown, attempt: number): number {
+    if (
+      err instanceof HttpError &&
+      (err.status === 429 || err.status === 503) &&
+      err.retryAfterMs !== undefined
+    ) {
+      return Math.min(err.retryAfterMs, MAX_RETRY_WAIT_MS)
+    }
+    return this.config.retryDelayMs * 2 ** (attempt - 1)
   }
 
   private isRetryable(err: unknown): boolean {
@@ -265,6 +277,11 @@ export class HttpTransport {
     if (err instanceof TimeoutError) return true
     if (err instanceof NetworkError) return true
     if (err instanceof RateLimitError) return true
+    // A 504 TOO_BROAD (search too broad to finish in time) fails the same way
+    // again: the query needs more words or filters, not another attempt.
+    if (err instanceof HttpError && err.status === 504 && errorCode(err.body) === 'TOO_BROAD') {
+      return false
+    }
     if (err instanceof HttpError && err.status && err.status >= 500) return true
     return false
   }
@@ -295,6 +312,15 @@ function extractMessage(body: unknown): string | undefined {
     for (const key of ['error', 'message', 'detail', 'msg']) {
       if (typeof b[key] === 'string') return b[key] as string
     }
+  }
+  return undefined
+}
+
+/** The API's error `code` from a JSON error body, if any. */
+function errorCode(body: unknown): string | undefined {
+  if (body && typeof body === 'object') {
+    const code = (body as Record<string, unknown>).code
+    if (typeof code === 'string') return code
   }
   return undefined
 }

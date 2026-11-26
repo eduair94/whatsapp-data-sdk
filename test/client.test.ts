@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AuthError,
   HttpError,
@@ -608,11 +608,11 @@ describe('searchFacebookLeak', () => {
     expect((err as RateLimitError).body).toMatchObject({ code: 'RATE_LIMITED' })
   })
 
-  it('surfaces 504 TOO_BROAD as HttpError, with no retry when retries:0', async () => {
+  it('surfaces 504 TOO_BROAD as HttpError and never retries it', async () => {
     const { client, calls } = make([
       { status: 504, json: { success: false, code: 'TOO_BROAD', error: 'Too many matches' } },
     ])
-    const err = await client.searchFacebookLeak({ q: 'john', retries: 0 }).catch((e: unknown) => e)
+    const err = await client.searchFacebookLeak({ q: 'john' }).catch((e: unknown) => e)
     expect(err).toBeInstanceOf(HttpError)
     expect(err).toMatchObject({ status: 504, body: { code: 'TOO_BROAD' } })
     expect(calls).toHaveLength(1)
@@ -621,7 +621,7 @@ describe('searchFacebookLeak', () => {
   it('retries 503 BUSY like any 5xx GET', async () => {
     const { client, calls } = make(
       [
-        { status: 503, json: { success: false, code: 'BUSY', error: 'busy' }, headers: { 'retry-after': '5' } },
+        { status: 503, json: { success: false, code: 'BUSY', error: 'busy' }, headers: { 'retry-after': '0' } },
         { json: page },
       ],
       { retryDelayMs: 1 }
@@ -812,11 +812,11 @@ describe('searchLinkedIn', () => {
     expect((err as RateLimitError).body).toMatchObject({ code: 'RATE_LIMITED' })
   })
 
-  it('surfaces 504 TOO_BROAD as HttpError, with no retry when retries:0', async () => {
+  it('surfaces 504 TOO_BROAD as HttpError and never retries it', async () => {
     const { client, calls } = make([
       { status: 504, json: { success: false, code: 'TOO_BROAD', error: 'Too many matches' } },
     ])
-    const err = await client.searchLinkedIn({ q: 'engineer', retries: 0 }).catch((e: unknown) => e)
+    const err = await client.searchLinkedIn({ q: 'engineer' }).catch((e: unknown) => e)
     expect(err).toBeInstanceOf(HttpError)
     expect(err).toMatchObject({ status: 504, body: { code: 'TOO_BROAD' } })
     expect(calls).toHaveLength(1)
@@ -886,5 +886,95 @@ describe('error mapping', () => {
     const res = await client.getProfile('59898297150')
     expect(res.exists).toBe(true)
     expect(calls).toHaveLength(2)
+  })
+})
+
+describe('retry policy', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const ok = { number: '59898297150', exists: true }
+
+  it('does not retry 504 TOO_BROAD with the default retries, but retries any other 504', async () => {
+    const tooBroad = make(
+      [{ status: 504, json: { success: false, code: 'TOO_BROAD', error: 'Too many matches' } }, { json: ok }],
+      { retryDelayMs: 1 }
+    )
+    const err = await tooBroad.client.getProfile('59898297150').catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err).toMatchObject({ status: 504, body: { code: 'TOO_BROAD' } })
+    expect(tooBroad.calls).toHaveLength(1)
+
+    const gateway = make([{ status: 504, json: { error: 'gateway timeout' } }, { json: ok }], { retryDelayMs: 1 })
+    expect((await gateway.client.getProfile('59898297150')).exists).toBe(true)
+    expect(gateway.calls).toHaveLength(2)
+  })
+
+  it('waits the Retry-After of a 503 instead of the backoff', async () => {
+    vi.useFakeTimers()
+    const { client, calls } = make(
+      [{ status: 503, json: { success: false, code: 'BUSY', error: 'busy' }, headers: { 'retry-after': '5' } }, { json: ok }],
+      { retryDelayMs: 10 }
+    )
+    const pending = client.getProfile('59898297150')
+    await vi.advanceTimersByTimeAsync(4_999)
+    expect(calls).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect((await pending).exists).toBe(true)
+    expect(calls).toHaveLength(2)
+  })
+
+  it('waits the Retry-After of a 429 even when it is shorter than the backoff', async () => {
+    vi.useFakeTimers()
+    const { client, calls } = make(
+      [{ status: 429, json: { error: 'slow down' }, headers: { 'retry-after': '1' } }, { json: ok }],
+      { retryDelayMs: 10_000 }
+    )
+    const pending = client.getProfile('59898297150')
+    await vi.advanceTimersByTimeAsync(999)
+    expect(calls).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect((await pending).exists).toBe(true)
+    expect(calls).toHaveLength(2)
+  })
+
+  it('caps a long Retry-After at 30 seconds', async () => {
+    vi.useFakeTimers()
+    const { client, calls } = make(
+      [{ status: 503, json: { code: 'BUSY' }, headers: { 'retry-after': '120' } }, { json: ok }]
+    )
+    const pending = client.getProfile('59898297150')
+    await vi.advanceTimersByTimeAsync(29_999)
+    expect(calls).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect((await pending).exists).toBe(true)
+    expect(calls).toHaveLength(2)
+  })
+
+  it('falls back to the exponential backoff without Retry-After', async () => {
+    vi.useFakeTimers()
+    const { client, calls } = make([{ status: 503, json: { code: 'BUSY' } }, { json: ok }], { retryDelayMs: 200 })
+    const pending = client.getProfile('59898297150')
+    await vi.advanceTimersByTimeAsync(199)
+    expect(calls).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect((await pending).exists).toBe(true)
+    expect(calls).toHaveLength(2)
+  })
+
+  it('still stops after the configured retries and exposes retryAfterMs on the 503', async () => {
+    vi.useFakeTimers()
+    const { client, calls } = make(
+      [{ status: 503, json: { success: false, code: 'BUSY', error: 'busy' }, headers: { 'retry-after': '2' } }],
+      { retries: 1 }
+    )
+    const pending = client.getProfile('59898297150').catch((e: unknown) => e)
+    await vi.advanceTimersByTimeAsync(2_000)
+    const err = await pending
+    expect(calls).toHaveLength(2)
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err).not.toBeInstanceOf(RateLimitError)
+    expect((err as HttpError).retryAfterMs).toBe(2000)
   })
 })

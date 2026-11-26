@@ -279,8 +279,9 @@ export class WhatsAppDataClient {
    * - `429` {@link RateLimitError} — `RATE_LIMITED` (30/min and 2,000/day per
    *   key); `retryAfterMs` comes from `Retry-After`.
    * - `502` `UPSTREAM_ERROR`, `503` `BUSY`, `504` `TOO_BROAD` (add words, a
-   *   `field` or `countryCode`) — {@link HttpError}. Like every 5xx on a GET
-   *   they are retried per `retries`; pass `retries: 0` to fail fast.
+   *   `field` or `countryCode`) — {@link HttpError}. `502` and `503` are
+   *   retried per `retries` (a `503` after its `Retry-After`, at most 30 s);
+   *   `504` `TOO_BROAD` is never retried.
    */
   async searchFacebookLeak(
     params: FacebookLeakSearchParams = {}
@@ -330,8 +331,9 @@ export class WhatsAppDataClient {
    * - `429` {@link RateLimitError} — `RATE_LIMITED` (30/min and 2,000/day per
    *   key); `retryAfterMs` comes from `Retry-After`.
    * - `502` `UPSTREAM_ERROR`, `503` `BUSY`/`UNAVAILABLE`, `504` `TOO_BROAD`
-   *   (add words or filters) — {@link HttpError}. Like every 5xx on a GET
-   *   they are retried per `retries`; pass `retries: 0` to fail fast.
+   *   (add words or filters) — {@link HttpError}. `502` and `503` are
+   *   retried per `retries` (a `503` after its `Retry-After`, at most 30 s);
+   *   `504` `TOO_BROAD` is never retried.
    */
   async searchLinkedIn(
     params: LinkedInSearchParams = {}

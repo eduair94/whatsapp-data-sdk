@@ -5,6 +5,7 @@
 - `searchLinkedIn(params)` — `GET /linkedin/search`: search the LinkedIn profile dataset by words (`q`), filters (`country`, `industry`, `jobRole`, `companySize`, `salary`, `company`, `has`) or phone number (`number`), with cursor paging (`cursor` / `data.nextCursor`), `limit` and `whatsapp`. Each profile is crossed with the WhatsApp cache by number (`whatsapp`, cache-only — never a live lookup) unless `whatsapp:false`. Direct API keys only; on RapidAPI the API answers `403` (`AuthError`). New types `LinkedInSearchParams`, `LinkedInSearchResponse`, `LinkedInSearchItem`, `LinkedInProfile`, `LinkedInWhatsAppNumber` and friends.
 - `getProfile` takes `linkedin:true` (sent as `linkedin=1`) to add the LinkedIn profiles (at most 3) whose phone matches the number: `WhatsAppEntry.linkedin` is `{ success: true, profiles, count }` or `{ error, success: null }` (`LinkedInLookupResult`). Returned by the direct API and the RapidAPI WP Data / DB Only listings, not by the Number Validator listing.
 - Query encoding: an array query value is now sent as the key repeated per item (`has=phones&has=emails`); an empty array is omitted.
+- Retries: a `504` whose body `code` is `TOO_BROAD` is no longer retried (the same search would time out again; add words or filters). A `429` or `503` with `Retry-After` now waits that long before the retry instead of the exponential backoff, at most 30 s, within the configured `retries`. `HttpError.retryAfterMs` carries a `503`'s `Retry-After` (`RateLimitError.retryAfterMs` is unchanged).
 
 ## 1.4.0
 

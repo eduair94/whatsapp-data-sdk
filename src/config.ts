@@ -33,10 +33,14 @@ export interface WhatsAppDataClientOptions {
   timeoutMs?: number
   /**
    * Retry attempts on transient failures (5xx / 429 / network / timeout).
-   * Applies to idempotent GETs only — POSTs are not auto-retried. Default 2.
+   * Applies to idempotent GETs only — POSTs are not auto-retried. A `504`
+   * `TOO_BROAD` is never retried. Default 2.
    */
   retries?: number
-  /** Base backoff between retries in ms (exponential). Default 500. */
+  /**
+   * Base backoff between retries in ms (exponential). Default 500. A `429` or
+   * `503` with `Retry-After` waits that long instead (at most 30 s).
+   */
   retryDelayMs?: number
   /** Custom `User-Agent`. */
   userAgent?: string

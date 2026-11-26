@@ -179,8 +179,9 @@ per successful page.
 - `429` `RATE_LIMITED` (30/min and 2,000/day per key) → `RateLimitError` with
   `retryAfterMs`.
 - `502` `UPSTREAM_ERROR`, `503` `BUSY`, `504` `TOO_BROAD` (add words, a
-  `field` or `countryCode`) → `HttpError`, retried like any 5xx GET; pass
-  `retries: 0` to fail fast.
+  `field` or `countryCode`) → `HttpError`. `502` and `503` are retried per
+  `retries` (a `503` after its `Retry-After`, at most 30 s); `504` `TOO_BROAD`
+  is never retried: the same query would time out again.
 
 The API's error code is in `err.body.code`.
 
@@ -231,8 +232,9 @@ dataset is still being indexed and the newest profiles may be missing.
 - `429` `RATE_LIMITED` (30/min and 2,000/day per key) → `RateLimitError` with
   `retryAfterMs`.
 - `502` `UPSTREAM_ERROR`, `503` `BUSY`/`UNAVAILABLE`, `504` `TOO_BROAD` (add
-  words or filters) → `HttpError`, retried like any 5xx GET; pass
-  `retries: 0` to fail fast.
+  words or filters) → `HttpError`. `502` and `503` are retried per `retries`
+  (a `503` after its `Retry-After`, at most 30 s); `504` `TOO_BROAD` is never
+  retried: the same query would time out again.
 
 The API's error code is in `err.body.code`.
 
@@ -322,7 +324,7 @@ handles everything. The full taxonomy:
 | `ValidationError` | Bad arguments (thrown **synchronously**, before any request; no `.status`). |
 | `AuthError` | `401` / `403` — missing, invalid, or unsubscribed key. |
 | `RateLimitError` | `429` — carries `retryAfterMs` when the server sent `Retry-After`. |
-| `HttpError` | Any other non-2xx (e.g. `400`, `5xx`); carries `.status` and `.body`. |
+| `HttpError` | Any other non-2xx (e.g. `400`, `5xx`); carries `.status` and `.body`, and `retryAfterMs` on a `503` with `Retry-After`. |
 | `TimeoutError` | The request exceeded `timeoutMs`. |
 | `NetworkError` | Transport failure (DNS, connection reset, mid-body abort). |
 | `WhatsAppDataError` | Base class for all of the above. |
@@ -349,8 +351,8 @@ new WhatsAppDataClient({
   apiKey: '...',           // required
   transport: 'proxy',      // 'proxy' | 'rapidapi'
   timeoutMs: 60000,        // request timeout (bounds headers AND body read)
-  retries: 2,              // retry 5xx / 429 / network / timeout (GET only) with backoff
-  retryDelayMs: 500,       // exponential base; 429 honors Retry-After when longer
+  retries: 2,              // retry 5xx / 429 / network / timeout (GET only); never 504 TOO_BROAD
+  retryDelayMs: 500,       // exponential base; a 429/503 Retry-After replaces it (max 30 s)
   baseUrl: '...',          // override live base URL
   cacheBaseUrl: '...',     // override cache/DB-only base URL
   rapidApiHost: '...',     // override live x-rapidapi-host

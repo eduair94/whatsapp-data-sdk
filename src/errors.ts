@@ -29,12 +29,19 @@ export class WhatsAppDataError extends Error {
 
 /** A non-2xx HTTP response. */
 export class HttpError extends WhatsAppDataError {
+  /**
+   * Milliseconds the server asked to wait before retrying, parsed from the
+   * `Retry-After` header of a `429` or `503` (if any).
+   */
+  readonly retryAfterMs?: number
+
   constructor(
     message: string,
-    options: { status: number; body?: unknown; url?: string }
+    options: { status: number; body?: unknown; url?: string; retryAfterMs?: number }
   ) {
     super(message, options)
     this.name = 'HttpError'
+    this.retryAfterMs = options.retryAfterMs
   }
 }
 
@@ -49,11 +56,8 @@ export class AuthError extends HttpError {
   }
 }
 
-/** Rate limit exceeded (429). */
+/** Rate limit exceeded (429). `retryAfterMs` comes from the `Retry-After` header (if any). */
 export class RateLimitError extends HttpError {
-  /** Milliseconds to wait before retrying, parsed from the `Retry-After` header (if any). */
-  readonly retryAfterMs?: number
-
   constructor(
     message: string,
     options: {
@@ -65,7 +69,6 @@ export class RateLimitError extends HttpError {
   ) {
     super(message, options)
     this.name = 'RateLimitError'
-    this.retryAfterMs = options.retryAfterMs
   }
 }
 
